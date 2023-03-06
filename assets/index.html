@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js" integrity="sha512-894YE6QWD5I59HgZOGReFYm4dnWc1Qt5NtvYSaNcOP+u1T9qYdvdihz0PPSiiqn/+/3e7Jo4EaG7TubfWGUrMQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script src="evohtml5player-latest-unminify.bundle.js"></script>
+    <meta name="viewport" content="width=device-width">
+    <style>
+        video {
+            width: 98%;
+        }
+
+        .vid-container {
+            background-image: url("../View/evo.png");
+            background-color: #363739;
+            background-repeat: no-repeat;
+            background-size: cover;
+             position:relative;
+        }
+          .vid-container .btn-play span {
+                font-size: 1.5rem;
+            }
+
+            .vid-container .btn-play {
+                position: absolute;
+                top: 5%;
+                left: 5%;
+            }
+            .vid-container .d-none {
+                display: none;
+            }
+
+        .vid-container .btn {
+            display: inline-block;
+            margin-bottom: 0;
+            font-weight: 400;
+            text-align: center;
+            vertical-align: middle;
+            touch-action: manipulation;
+            cursor: pointer;
+            background-image: none;
+            border: 1px solid transparent;
+            white-space: nowrap;
+            padding: 6px 12px;
+            font-size: 13px;
+            line-height: 1.42857143;
+            border-radius: 2px;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+    </style>
+
+</head>
+
+<body>
+
+<div class="container-fluid">
+    <div class="mb-auto col-lg-3 mb-4">
+        <label class="form-label">Choose a site:</label>
+        <select class="form-control" name="siteList" id="siteList" onchange="loadCamera(this.value)">
+            <option value="">SELECT SITE</option>
+        </select>
+    </div>
+    <div class="row" id="multiSiteId"></div>
+</div>
+
+<script>
+console.log($.fn.jquery)
+        let originalResponse = null;
+        var playerObj = {},
+            allSiteIds = [],
+            allSiteCamDetails = null;
+        let configPort, configBank, configBankEndPoint;
+        let camOrder = ["Outdoor", "Lobby", "Pinhole", "Backroom"];
+  let firstplay = false,loadplay=false;
+        let configVar = {
+            "configPort": {
+                "http": 8410,
+                "https": 8420
+            },
+            "configBankEndPoint": {
+                "sitesWithCamAPI": "http://ncrsbiinnitiate.aparinnosys.com/WebService.asmx/GetSitesWithCameraList",
+                "checkStreamAPI": "http://ncrsbiinnoculate.aparinnosys.com:3000/webappapi/streamdetails?streamname=",
+                "startStreamAPI": "https://ncrsbiinnitiate.aparinnosys.com/rest/api/Mobile/StartStream",
+
+                "bankCode": "105",
+                "secretPassword": "$ecretWayP@ss"
+            }
+        }
+         $(document).ready(function() {
+            console.log("ready!");
+            setupConfig(configVar)
+            $('#siteList').select2();
+        });
+
+        function setupConfig(config) {
+            configPort = config.configPort;
+            // configBank = config.configBank;
+            configBankEndPoint = config["configBankEndPoint"];
+            startup();
+        }
+
+        function startup() {
+            getAllSiteDetails();
+        }
+
+        function getAllSiteDetails() {
+            // $("#loading").show();
+            if (originalResponse != null) {
+                storeSiteAllDetails(originalResponse)
+                initSetup();
+                return;
+            }
+
+            $.ajax({
+                type: "POST",
+                url: configBankEndPoint["sitesWithCamAPI"],
+                contentType: "application/json; charset=utf-8",
+                data: `{
+                "bankCode":"${configBankEndPoint["bankCode"]}",
+                "secretPassword": "${configBankEndPoint["secretPassword"]}"
+            }`,
+                dataType: "json",
+                success: function(Data) {
+                    // $("#loading").hide();
+
+                    if (Data.hasOwnProperty("d")) {
+                        // console.log(JSON.parse(Data.d));
+                        originalResponse = JSON.parse(Data.d);
+                        storeSiteAllDetails(JSON.parse(Data.d));
+                        initSetup();
+                    }
+                },
+                error: function(status) {
+                    $("#loading").hide();
+                }
+            });
+
+        }
+
+        function storeSiteAllDetails(data) {
+            // console.log(`storeSiteAllDetails(${data})`);
+            allSiteCamDetails = data;
+            allSiteIds = Object.keys(data);
+            allSiteIds.sort();
+         }
+
+        function initSetup() {
+            // closeMSV_Page();
+            // resetInitialPageSetup();
+            firstplay = true;
+            loadplay=true;
+           // LoadCamera(vboxid, cam_FullName," 202.mp4");
+            $("#multiSiteId").html("");
+            let options = "<option value='' selected>SELECT SITE</option>";
+            for (var cnt = 0; cnt < allSiteIds.length; cnt++) {
+                options += `<option value="${allSiteIds[cnt]}">${allSiteIds[cnt]}</option>`;
+            }
+            $("#siteList").html(options);
+        }
+       function closeMSV_Page(siteid) {
+            let vboxid = (Object.keys(allSiteCamDetails[siteid]))[0];
+            let siteCamArr = allSiteCamDetails[siteid][vboxid];
+            let elemPresent = document.getElementById("msv_col_" + siteid);
+            if (!elemPresent) {
+                return;
+            }
+            for (var cnt = 0; cnt < siteCamArr.length; cnt++) {
+                closeMSVSite(siteid, siteCamArr[cnt]);
+            }
+            document.getElementById("msv_col_" + siteid).remove();
+        }
+
+        function closeMSVSite(siteid, cam_FullName) {
+            cam_FullName = cam_FullName.trim();
+            let cam_initial = cam_FullName.substring(0, 1);
+            if (playerObj.hasOwnProperty(siteid + "_" + cam_FullName)) {
+                if (
+                    playerObj[siteid + "_" + cam_FullName + "_obj"].curentlyStreaming == true
+                ) {
+                    playerObj[siteid + "_" + cam_FullName].stop();
+                }
+                playerObj[siteid + "_" + cam_FullName] = null;
+                delete playerObj[siteid + "_" + cam_FullName];
+                delete playerObj[siteid + "_" + cam_FullName + "_obj"];
+                let chk_player = document.getElementById(`${siteid}_${cam_FullName}_VideoTag`);
+                if (chk_player) {
+                    document.getElementById(`${siteid}_${cam_FullName}_VideoTag`).remove();
+                }
+            }
+        }
+
+        function loadCamera(siteid) {
+            debugger;
+            var multi_site = document.getElementById("multiSiteId");
+            multi_site.innerHTML = "";
+
+            let vboxid = (Object.keys(allSiteCamDetails[siteid]))[0];
+            let siteCamArr = allSiteCamDetails[siteid][vboxid];
+            multi_site.innerHTML += templateMaker(siteid, vboxid);
+            for (var cnt = 0; cnt < siteCamArr.length; cnt++) {
+                configProcess(vboxid, siteCamArr[cnt]);
+            }
+        }
+
+        function templateMaker(siteid, vboxid) {
+            // console.log(`templateMaker(${siteid})`); //${colSize}, ${checked}
+            const camObj = templateMaker_Camera(siteid, vboxid);
+            return `
+            <div class='col-12' id="msv_col_${vboxid}">
+              <div class="card border-primary">
+                <div class="card-header">
+                  ${siteid} - ${vboxid}
+                </div>
+                <div class="card-body">
+                  ${camObj.cameraHTMl}
+                </div>
+              </div>
+            </div>
+        `;
+        }
+
+        function templateMaker_Camera(siteid, vboxid) {
+            // console.log(`templateMaker_Camera(${siteid})`);
+            let cameraListArray = allSiteCamDetails[siteid][vboxid];
+            let returnHTML = "";
+            for (let cnt = 0; cnt < camOrder.length; cnt++) {
+                let crntdate = new Date();
+                if (cameraListArray.indexOf(camOrder[cnt]) != -1) {
+                    returnHTML += `
+              <div style="margin:5px 0" class="vid-container">
+                  <video id="${vboxid}_${camOrder[cnt]}_VideoTag"  poster="evo.png?${crntdate.getTime()}" src="202.mp4?${crntdate.getTime()}" muted loop></video>
+
+                    <button type="button" id="${vboxid}_${camOrder[cnt]}_PlayBtn" class="btn btn-primary btn-play d-none"  onclick="reload('${vboxid}','${camOrder[cnt]}')"> <span>▶</span> </button >;
+
+              </div>`;
+                }
+            }
+            return {
+                cameraHTMl: returnHTML
+            };
+
+        }
+function reload(vboxid, cam_FullName) {
+
+            firstplay = true;
+    LoadCamera(vboxid, cam_FullName, " 202.mp4");
+    document.getElementById(vboxid+'_'+cam_FullName + "_PlayBtn").classList.add("d-none")
+            configProcess(vboxid, cam_FullName);
+        }
+        function configProcess(vboxid, cam_FullName) {
+            // console.log(`configProcess(${siteid}, ${cam_FullName})`);
+            cam_FullName = cam_FullName.trim();
+            let cam_initial = cam_FullName.substring(0, 1);
+            playerObj[vboxid + "_" + cam_FullName] = null;
+            playerObj[vboxid + "_" + cam_FullName + "_obj"] = {
+                firstPlay: false,
+                curentlyStreaming: false,
+            };
+            // LoadCamera(siteid, cam_FullName, "202.mp4");
+            CheckStreamStatus(vboxid, "_" + cam_initial, cam_FullName);
+        }
+
+        function CheckStreamStatus(vboxid, cam_initial, cam_FullName) {
+            //console.log(`CheckStreamStatus(${vboxid}, ${cam_FullName}, ${onlyStartStream})`);
+            if (!playerObj.hasOwnProperty(vboxid + "_" + cam_FullName)) {
+                return;
+            }
+            let checkStreamURL = `${configBankEndPoint["checkStreamAPI"]}${vboxid}${cam_initial}`;
+
+            // console.log(checkStreamURL)
+            $.ajax({
+                type: "GET",
+                url: checkStreamURL,
+                dataType: "json",
+                contentType: "application/json; charset=utf-8",
+                success: function(obj) {
+                    if ((Object.keys(obj).length === 0 && obj.constructor === Object) || obj.startStream) {
+                    if (firstplay == true)
+                        StartStream(vboxid, cam_FullName);
+                        setTimeout(function() {
+                        if (firstplay == true)
+                            CheckStreamStatus(vboxid, cam_initial, cam_FullName);
+
+                        }, 30000);
+                        if (firstplay == true && loadplay)
+                        LoadCamera(vboxid, cam_FullName," 202.mp4");
+                       // StartStream(vboxid, cam_FullName);
+                        return;
+                    }
+                    LoadCamera(vboxid, cam_FullName, obj.uri);
+                      firstplay = false;
+                      loadplay=false;
+                    // document.getElementById(vboxid + '_' + cam_FullName + "_PlayBtn").classList.add("d-none")
+                }
+            });
+        }
+
+        function StartStream(vboxid, cam_FullName) {
+
+            if (!playerObj.hasOwnProperty(vboxid + "_" + cam_FullName)) {
+                return;
+            }
+            $.ajax({
+                type: "POST",
+                url: configBankEndPoint["startStreamAPI"],
+                contentType: "application/json; charset=utf-8",
+                data: `{
+          "vboxid":${vboxid},
+          "Cameraname" : "${cam_FullName}",
+      }`,
+                dataType: "json",
+                success: function(Data) {
+                    if (Data != null) {
+                        result = "sent";
+                    } else {
+                        result = null;
+                    }
+                },
+            });
+        }
+
+        function LoadCamera(vboxid, cam_FullName, uri) {
+            console.log(`LoadCamera(${vboxid}, ${cam_FullName}, ${uri})`);
+            cam_FullName = cam_FullName.trim();
+            // let cam_initial = cam_FullName.substring(0, 1);
+            if (!playerObj.hasOwnProperty(vboxid + "_" + cam_FullName)) {
+                return;
+            }
+            if (uri.indexOf("wss") != -1) {
+                let chk_player = document.getElementById(
+                    `${vboxid}_${cam_FullName}_VideoTag`
+                );
+                if (!chk_player) {
+                    // console.log(`Element Not found ${vboxid}_${cam_FullName}_VideoTag`);
+                    return;
+                }
+                let player = !!document.getElementById(
+                    `${vboxid}_${cam_FullName}_VideoTag`
+                );
+                player.type = "";
+                let uriarr = uri.split("/");
+                let host = uriarr[2];
+                let stream_val = uriarr[3];
+                playWs(host, vboxid, cam_FullName, stream_val);
+                return;
+            } else {
+                playerObj[vboxid + "_" + cam_FullName + "_obj"].firstPlay = false;
+                playerObj[vboxid + "_" + cam_FullName + "_obj"].curentlyStreaming = false;
+                let chk_player = !!document.getElementById(
+                    `${vboxid}_${cam_FullName}_VideoTag`
+                );
+                if (!chk_player) {
+                    return;
+                }
+                let player = document.getElementById(`${vboxid}_${cam_FullName}_VideoTag`);
+                let crntSrc = player.src.split("/")[4];
+                if (crntSrc == uri) {
+                    return;
+                }
+                player.type = "video/mp4";
+                player.src = uri;
+                player.load();
+                let promise = document
+                    .getElementById(`${vboxid}_${cam_FullName}_VideoTag`)
+                    .play(); //VideoTag_code
+                if (promise !== undefined) {
+                    promise.then(
+                        function(result) {
+                            // Autoplay started!
+                        },
+                        function(error) {}
+                    );
+                }
+            }
+        }
+
+        function playWs(host, vboxid, cam_FullName, stream_name) {
+            // console.log(`playWs(${vboxid}, ${cam_FullName})`);
+            cam_FullName = cam_FullName.trim();
+            let cam_initial = cam_FullName.substring(0, 1);
+            let hostname = host,
+                portnum = "",
+                setSsl = true;
+            if (host.indexOf(":") != -1) {
+                hostname = host.split(":")[0];
+                portnum = host.split(":")[1];
+            }
+            if (window.location.protocol == "http:") {
+                setSsl = false;
+                portnum = configPort.http;
+            }
+            if (
+                playerObj.hasOwnProperty(vboxid + "_" + cam_FullName) &&
+                playerObj[vboxid + "_" + cam_FullName] != null
+            ) {
+                // console.log(`Already Running - ${vboxid}, ${cam_FullName}`);
+                return;
+            }
+            var opts = {
+                emsIp: hostname,
+                emsPort: portnum,
+                useSsl: setSsl,
+                streamName: stream_name,
+                videoTagId: `${vboxid}_${cam_FullName}_VideoTag`,
+            };
+
+            playerObj[vboxid + "_" + cam_FullName] = new EvoWsPlayer(opts);
+            playerObj[vboxid + "_" + cam_FullName].play();
+            playerObj[vboxid + "_" + cam_FullName + "_obj"].curentlyStreaming = true;
+            console.log(`EVO Streaming started - ${vboxid}, ${cam_FullName}`);
+        }
+
+        function restartWSStream(vboxid_camName) {
+            // console.log(`restartWSStream(${vboxid_camName})`);
+            let vboxid = vboxid_camName.split("_")[0];
+            let cam_FullName = vboxid_camName.split("_")[1];
+            let cam_initial = cam_FullName.substring(0, 1);
+            if (playerObj[vboxid + "_" + cam_FullName + "_obj"].firstPlay) {
+                return;
+            }
+            playerObj[vboxid + "_" + cam_FullName].stop();
+            playerObj[vboxid + "_" + cam_FullName] = null;
+            playerObj[vboxid + "_" + cam_FullName + "_obj"].curentlyStreaming = false;
+            playerObj[vboxid + "_" + cam_FullName + "_obj"].firstPlay = true;
+             document.getElementById(vboxid_camName + "_PlayBtn").classList.remove("d-none")
+            CheckStreamStatus(vboxid, "_" + cam_FullName, cam_FullName, null);
+            setTimeout(function() {
+                if (playerObj[vboxid + "_" + cam_FullName + "_obj"].firstPlay) {
+                    playerObj[vboxid + "_" + cam_FullName + "_obj"].firstPlay = false;
+                }
+            }, 30000);
+        }
+    </script>
+
+
+
+</body>
+
+</html>
